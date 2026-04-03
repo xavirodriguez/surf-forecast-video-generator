@@ -1,0 +1,5 @@
+{
+  "name": "Surf Forecast Video Generator",
+  "description": "A Remotion project to generate automated surf and weather forecast videos in multiple formats (Landscape, Portrait, Square).",
+  "requestFramePermissions": []
+}
