@@ -1,71 +1,87 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 export type TidePrediction = {
   time: string;
   height: number;
   type: "high" | "low";
 };
 
-export const fetchTides = async (stationId: string, date: string): Promise<TidePrediction[]> => {
-  // date format: YYYYMMDD
-  const endDate = new Date(
-    parseInt(date.substring(0, 4)),
-    parseInt(date.substring(4, 6)) - 1,
-    parseInt(date.substring(6, 8)) + 2
-  )
+const NOAA_API_URL = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter";
+
+function buildNoaaUrl(params: Record<string, string>): URL {
+  const url = new URL(NOAA_API_URL);
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
+  url.searchParams.set("application", "surf_forecast");
+  url.searchParams.set("format", "json");
+  return url;
+}
+
+async function fetchFromNoaa(url: URL) {
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error(`NOAA API request failed with status: ${response.status}`);
+  }
+  return response.json();
+}
+
+function calculateEndDate(dateStr: string): string {
+  const year = parseInt(dateStr.substring(0, 4));
+  const month = parseInt(dateStr.substring(4, 6)) - 1;
+  const day = parseInt(dateStr.substring(6, 8)) + 2;
+
+  return new Date(year, month, day)
     .toISOString()
     .split("T")[0]
     .replace(/-/g, "");
+}
 
-  const url = new URL("https://api.tidesandcurrents.noaa.gov/api/prod/datagetter");
-  url.searchParams.set("begin_date", date);
-  url.searchParams.set("end_date", endDate);
-  url.searchParams.set("station", stationId);
-  url.searchParams.set("product", "predictions");
-  url.searchParams.set("datum", "MLLW");
-  url.searchParams.set("time_zone", "lst_ldt");
-  url.searchParams.set("interval", "hilo");
-  url.searchParams.set("units", "metric");
-  url.searchParams.set("application", "surf_forecast");
-  url.searchParams.set("format", "json");
+export const fetchTides = async (stationId: string, date: string): Promise<TidePrediction[]> => {
+  const endDate = calculateEndDate(date);
+  const url = buildNoaaUrl({
+    begin_date: date,
+    end_date: endDate,
+    station: stationId,
+    product: "predictions",
+    datum: "MLLW",
+    time_zone: "lst_ldt",
+    interval: "hilo",
+    units: "metric",
+  });
 
-  try {
-    const response = await fetch(url.toString());
-    if (!response.ok) return [];
-    const data = await response.json();
-    if (!data.predictions) return [];
+  const data = await fetchFromNoaa(url);
 
-    return data.predictions.map((p: any) => ({
-      time: p.t,
-      height: parseFloat(p.v),
-      type: p.type === "H" ? "high" : "low",
-    }));
-  } catch (e) {
-    console.error("Error fetching tides from NOAA:", e);
-    return [];
+  if (!data.predictions) {
+    throw new Error(`No tide predictions found for station ${stationId}`);
   }
+
+  return data.predictions.map((prediction: any) => ({
+    time: prediction.t,
+    height: parseFloat(prediction.v),
+    type: prediction.type === "H" ? "high" : "low",
+  }));
 };
 
-export const fetchWaterTemp = async (stationId: string): Promise<number | null> => {
-  const url = new URL("https://api.tidesandcurrents.noaa.gov/api/prod/datagetter");
-  url.searchParams.set("range", "24");
-  url.searchParams.set("station", stationId);
-  url.searchParams.set("product", "water_temperature");
-  url.searchParams.set("datum", "MLLW");
-  url.searchParams.set("time_zone", "lst_ldt");
-  url.searchParams.set("units", "metric");
-  url.searchParams.set("application", "surf_forecast");
-  url.searchParams.set("format", "json");
+export const fetchWaterTemp = async (stationId: string): Promise<number> => {
+  const url = buildNoaaUrl({
+    range: "24",
+    station: stationId,
+    product: "water_temperature",
+    datum: "MLLW",
+    time_zone: "lst_ldt",
+    units: "metric",
+  });
 
-  try {
-    const response = await fetch(url.toString());
-    if (!response.ok) return null;
-    const data = await response.json();
-    if (!data.data || data.data.length === 0) return null;
+  const data = await fetchFromNoaa(url);
 
-    // Get the most recent value
-    const latest = data.data[data.data.length - 1];
-    return parseFloat(latest.v);
-  } catch (e) {
-    console.error("Error fetching water temp from NOAA:", e);
-    return null;
+  if (!data.data || data.data.length === 0) {
+    throw new Error(`No water temperature data found for station ${stationId}`);
   }
+
+  const latestObservation = data.data[data.data.length - 1];
+  return parseFloat(latestObservation.v);
 };
