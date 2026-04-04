@@ -1,3 +1,8 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { Composition, Folder, Still, CalculateMetadataFunction } from "remotion";
 import { SurfForecast } from "./components/SurfForecast";
 import { surfForecastSchema, SurfForecastProps } from "./schemas/surf-forecast";
@@ -63,7 +68,7 @@ const calculateSurfMetadata: CalculateMetadataFunction<SurfForecastProps> = asyn
 export const RemotionRoot = () => {
   return (
     <>
-      <Folder name="Surf Forecast">
+      <Folder name="surf-forecast">
         <Composition
           id="surf-forecast-landscape"
           component={SurfForecast}
@@ -120,7 +125,7 @@ export const RemotionRoot = () => {
           calculateMetadata={calculateSurfMetadata}
         />
       </Folder>
-      <Folder name="Thumbnails">
+      <Folder name="thumbnails">
         <Still
           id="surf-forecast-thumbnail"
           component={SurfThumbnail}
