@@ -67,27 +67,27 @@ function formatHourlyForecast(params: TransformParams, hourlyIndices: number[]):
       period: Math.round(period),
       windSpeed: Math.round(windSpeed),
       windDirection: degreesToCardinal(windData.hourly.winddirection_10m[index]),
-      rating: ratingFromWaveData(height, period, windSpeed),
+      rating: ratingFromWaveData({ height, period, windSpeed }),
     };
   });
 }
 
-function extractSwellData(params: TransformParams, safeIndex: number): SurfForecastProps["swellData"] {
+function extractSwellData(params: TransformParams, currentTimeIndex: number): SurfForecastProps["swellData"] {
   const { marineData, spotMeta } = params;
   const unit = spotMeta.currentWaveHeightUnit;
 
   const swell = {
-    height: parseFloat(convertWaveHeight(marineData.hourly.swell_wave_height[safeIndex], unit).toFixed(1)),
-    period: Math.round(marineData.hourly.swell_wave_period[safeIndex]),
-    direction: degreesToCardinal(marineData.hourly.swell_wave_direction[safeIndex]),
-    directionDegrees: marineData.hourly.swell_wave_direction[safeIndex],
+    height: parseFloat(convertWaveHeight(marineData.hourly.swell_wave_height[currentTimeIndex], unit).toFixed(1)),
+    period: Math.round(marineData.hourly.swell_wave_period[currentTimeIndex]),
+    direction: degreesToCardinal(marineData.hourly.swell_wave_direction[currentTimeIndex]),
+    directionDegrees: marineData.hourly.swell_wave_direction[currentTimeIndex],
   };
 
   const windWave = {
-    height: parseFloat(convertWaveHeight(marineData.hourly.wind_wave_height[safeIndex], unit).toFixed(1)),
-    period: Math.round(marineData.hourly.wave_period[safeIndex] * 0.8),
-    direction: degreesToCardinal(marineData.hourly.wave_direction[safeIndex]),
-    directionDegrees: marineData.hourly.wave_direction[safeIndex],
+    height: parseFloat(convertWaveHeight(marineData.hourly.wind_wave_height[currentTimeIndex], unit).toFixed(1)),
+    period: Math.round(marineData.hourly.wave_period[currentTimeIndex] * 0.8),
+    direction: degreesToCardinal(marineData.hourly.wave_direction[currentTimeIndex]),
+    directionDegrees: marineData.hourly.wave_direction[currentTimeIndex],
   };
 
   return [swell, windWave].filter((s) => s.height > 0);
@@ -105,40 +105,53 @@ function getTidesOrDefault(tidesData: TidePrediction[]): SurfForecastProps["tide
   ];
 }
 
+function getCurrentTimeIndex(times: string[], targetDate: string): number {
+  const timePrefix = targetDate.substring(0, 13);
+  const index = times.findIndex((t) => t.startsWith(timePrefix));
+  return index === -1 ? 0 : index;
+}
+
+function calculateCurrentAverages(marineData: MarineData, windData: WindData, currentIndex: number) {
+  const indices = [currentIndex, currentIndex + 1].filter((i) => i < marineData.hourly.time.length);
+  const sum = (arr: number[]) => indices.reduce((acc, i) => acc + arr[i], 0);
+  return {
+    avgHeight: sum(marineData.hourly.wave_height) / indices.length,
+    avgPeriod: sum(marineData.hourly.wave_period) / indices.length,
+    avgWind: sum(windData.hourly.windspeed_10m) / indices.length,
+  };
+}
+
+function getEffectiveWaterTemp(waterTemp: number | null, windData: WindData, currentIndex: number): number {
+  return waterTemp || windData.hourly.temperature_2m[currentIndex] || 18;
+}
+
 export const transformToSurfProps = (params: TransformParams): SurfForecastProps => {
   const { marineData, windData, tidesData, waterTemp, spotMeta, targetDate } = params;
   const now = new Date(targetDate);
-  const targetDayStr = now.toISOString().split("T")[0];
   const startHour = Math.max(now.getHours(), 6);
+  const hourlyIndices = getHourlyIndices(marineData, now.toISOString().split("T")[0], startHour);
 
-  const hourlyIndices = getHourlyIndices(marineData, targetDayStr, startHour);
-  const currentIndex = marineData.hourly.time.findIndex((t) => t.startsWith(now.toISOString().substring(0, 13)));
-  const safeIndex = currentIndex === -1 ? 0 : currentIndex;
-
-  const nextIndices = [safeIndex, safeIndex + 1].filter((i) => i < marineData.hourly.time.length);
-  const avgHeight = nextIndices.reduce((acc, i) => acc + marineData.hourly.wave_height[i], 0) / nextIndices.length;
-  const avgPeriod = nextIndices.reduce((acc, i) => acc + marineData.hourly.wave_period[i], 0) / nextIndices.length;
-  const avgWind = nextIndices.reduce((acc, i) => acc + windData.hourly.windspeed_10m[i], 0) / nextIndices.length;
-
-  const currentWaterTemp = waterTemp || windData.hourly.temperature_2m[safeIndex] || 18;
+  const currentTimeIndex = getCurrentTimeIndex(marineData.hourly.time, now.toISOString());
+  const averages = calculateCurrentAverages(marineData, windData, currentTimeIndex);
+  const currentWaterTemp = getEffectiveWaterTemp(waterTemp, windData, currentTimeIndex);
 
   return {
     spotName: spotMeta.spotName,
     spotLocation: spotMeta.spotLocation,
     date: now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }),
-    currentWaveHeight: parseFloat(convertWaveHeight(avgHeight, spotMeta.currentWaveHeightUnit).toFixed(1)),
+    currentWaveHeight: parseFloat(convertWaveHeight(averages.avgHeight, spotMeta.currentWaveHeightUnit).toFixed(1)),
     currentWaveHeightUnit: spotMeta.currentWaveHeightUnit,
-    currentPeriod: Math.round(avgPeriod),
-    currentDirection: degreesToCardinal(marineData.hourly.wave_direction[safeIndex]),
-    currentDirectionDegrees: marineData.hourly.wave_direction[safeIndex],
+    currentPeriod: Math.round(averages.avgPeriod),
+    currentDirection: degreesToCardinal(marineData.hourly.wave_direction[currentTimeIndex]),
+    currentDirectionDegrees: marineData.hourly.wave_direction[currentTimeIndex],
     waterTemp: Math.round(convertWaterTemp(currentWaterTemp, spotMeta.waterTempUnit)),
     waterTempUnit: spotMeta.waterTempUnit,
-    windSpeed: Math.round(avgWind),
-    windDirection: degreesToCardinal(windData.hourly.winddirection_10m[safeIndex]),
-    windDirectionDegrees: windData.hourly.winddirection_10m[safeIndex],
-    overallRating: ratingFromWaveData(avgHeight, avgPeriod, avgWind),
+    windSpeed: Math.round(averages.avgWind),
+    windDirection: degreesToCardinal(windData.hourly.winddirection_10m[currentTimeIndex]),
+    windDirectionDegrees: windData.hourly.winddirection_10m[currentTimeIndex],
+    overallRating: ratingFromWaveData({ height: averages.avgHeight, period: averages.avgPeriod, windSpeed: averages.avgWind }),
     hourlyForecast: formatHourlyForecast(params, hourlyIndices),
-    swellData: extractSwellData(params, safeIndex),
+    swellData: extractSwellData(params, currentTimeIndex),
     tides: getTidesOrDefault(tidesData),
     primaryColor: spotMeta.primaryColor,
     secondaryColor: spotMeta.secondaryColor,

@@ -3,11 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ratingFromWaveData, Rating } from "./rating-calculator";
+import { ratingFromWaveData } from "./rating-calculator";
 
 const assertEqual = (actual: any, expected: any, message: string) => {
   if (actual !== expected) {
-    throw new Error(`FAIL: ${message}. Expected ${expected}, but got ${actual}`);
+    throw new Error(
+      `FAIL: ${message}\n` +
+      `  Expected: "${expected}"\n` +
+      `  Actual:   "${actual}"`
+    );
   }
   console.log(`PASS: ${message}`);
 };
@@ -15,32 +19,55 @@ const assertEqual = (actual: any, expected: any, message: string) => {
 const runTests = () => {
   console.log("Running rating-calculator tests...");
 
+  // Flat condition
   // Given: No wave height
-  // When: ratingFromWaveData(0, 10, 5)
+  // When: ratingFromWaveData is called
   // Then: Returns "flat"
-  assertEqual(ratingFromWaveData(0, 10, 5), "flat", "Should return flat for zero wave height");
+  assertEqual(
+    ratingFromWaveData({ height: 0, period: 10, windSpeed: 5 }),
+    "flat",
+    "Should return flat for zero wave height"
+  );
 
-  // Given: Epic conditions
-  // When: ratingFromWaveData(1.9, 15, 8)
+  // Epic condition
+  // Given: High waves, long period, low wind
+  // When: ratingFromWaveData is called
   // Then: Returns "epic"
-  assertEqual(ratingFromWaveData(1.9, 15, 8), "epic", "Should return epic for 1.9m height, 15s period, and low wind");
+  assertEqual(
+    ratingFromWaveData({ height: 1.9, period: 15, windSpeed: 8 }),
+    "epic",
+    "Should return epic for 1.9m height, 15s period, and low wind"
+  );
 
-  // Given: Good conditions
-  // When: ratingFromWaveData(1.3, 13, 10)
+  // Good condition
+  // Given: Moderate waves and long period
+  // When: ratingFromWaveData is called
   // Then: Returns "good"
-  assertEqual(ratingFromWaveData(1.3, 13, 10), "good", "Should return good for 1.3m height and 13s period");
+  assertEqual(
+    ratingFromWaveData({ height: 1.3, period: 13, windSpeed: 10 }),
+    "good",
+    "Should return good for 1.3m height and 13s period"
+  );
 
-  // Given: Poor conditions (short period)
-  // When: ratingFromWaveData(0.5, 4, 10)
-  // Then: Returns "poor-fair" (it matches the height but period is low, and since we match top-down in the refactor...)
-  // Wait, let's re-verify the rules in our refactored code.
-  // { minHeight: 0.3, minPeriod: 0, maxWind: Infinity, rating: "poor-fair" }
-  assertEqual(ratingFromWaveData(0.5, 4, 10), "poor-fair", "Should return poor-fair for small wave with any period");
+  // Poor-Fair condition
+  // Given: Small waves with short period
+  // When: ratingFromWaveData is called
+  // Then: Returns "poor-fair"
+  assertEqual(
+    ratingFromWaveData({ height: 0.5, period: 4, windSpeed: 10 }),
+    "poor-fair",
+    "Should return poor-fair for small wave with any period"
+  );
 
-  // Given: Very small waves
-  // When: ratingFromWaveData(0.2, 10, 5)
-  // Then: Returns "poor" (no rule matches)
-  assertEqual(ratingFromWaveData(0.2, 10, 5), "poor", "Should return poor for very small waves that don't match any rule");
+  // Poor condition
+  // Given: Very small waves not matching any rule
+  // When: ratingFromWaveData is called
+  // Then: Returns "poor"
+  assertEqual(
+    ratingFromWaveData({ height: 0.2, period: 10, windSpeed: 5 }),
+    "poor",
+    "Should return poor for very small waves that don't match any rule"
+  );
 
   console.log("All rating-calculator tests passed!");
 };

@@ -11,24 +11,6 @@ export type MarineData = {
   };
 };
 
-export const fetchMarineData = async (lat: number, lon: number): Promise<MarineData> => {
-  const url = new URL("https://marine-api.open-meteo.com/v1/marine");
-  url.searchParams.set("latitude", lat.toString());
-  url.searchParams.set("longitude", lon.toString());
-  url.searchParams.set(
-    "hourly",
-    "wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period,swell_wave_direction,wind_wave_height"
-  );
-  url.searchParams.set("forecast_days", "3");
-  url.searchParams.set("timezone", "auto");
-
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error(`Failed to fetch marine data: ${response.statusText}`);
-  }
-  return response.json();
-};
-
 export type WindData = {
   hourly: {
     time: string[];
@@ -38,18 +20,33 @@ export type WindData = {
   };
 };
 
-export const fetchWindData = async (lat: number, lon: number): Promise<WindData> => {
-  const url = new URL("https://api.open-meteo.com/v1/forecast");
+const fetchFromOpenMeteo = async (baseUrl: string, lat: number, lon: number, extraParams: Record<string, string>) => {
+  const url = new URL(baseUrl);
   url.searchParams.set("latitude", lat.toString());
   url.searchParams.set("longitude", lon.toString());
-  url.searchParams.set("hourly", "windspeed_10m,winddirection_10m,temperature_2m");
   url.searchParams.set("forecast_days", "3");
   url.searchParams.set("timezone", "auto");
-  url.searchParams.set("wind_speed_unit", "mph");
+
+  Object.entries(extraParams).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
 
   const response = await fetch(url.toString());
   if (!response.ok) {
-    throw new Error(`Failed to fetch wind data: ${response.statusText}`);
+    throw new Error(`Failed to fetch from Open Meteo: ${response.statusText}`);
   }
   return response.json();
+};
+
+export const fetchMarineData = async (lat: number, lon: number): Promise<MarineData> => {
+  return fetchFromOpenMeteo("https://marine-api.open-meteo.com/v1/marine", lat, lon, {
+    hourly: "wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period,swell_wave_direction,wind_wave_height",
+  });
+};
+
+export const fetchWindData = async (lat: number, lon: number): Promise<WindData> => {
+  return fetchFromOpenMeteo("https://api.open-meteo.com/v1/forecast", lat, lon, {
+    hourly: "windspeed_10m,winddirection_10m,temperature_2m",
+    wind_speed_unit: "mph",
+  });
 };

@@ -5,6 +5,12 @@
 
 export type Rating = "flat" | "poor" | "poor-fair" | "fair" | "fair-good" | "good" | "epic";
 
+export interface WaveConditions {
+  height: number;
+  period: number;
+  windSpeed: number;
+}
+
 interface RatingRule {
   minHeight: number;
   minPeriod: number;
@@ -20,14 +26,20 @@ const RATING_RULES: RatingRule[] = [
   { minHeight: 0.3, minPeriod: 0, maxWind: Infinity, rating: "poor-fair" },
 ];
 
-export const ratingFromWaveData = (height: number, period: number, windSpeed: number): Rating => {
-  if (height === 0) {
+const isMatchingRule = (rule: RatingRule, conditions: WaveConditions): boolean => {
+  return (
+    conditions.height >= rule.minHeight &&
+    conditions.period >= rule.minPeriod &&
+    conditions.windSpeed < rule.maxWind
+  );
+};
+
+export const ratingFromWaveData = (conditions: WaveConditions): Rating => {
+  if (conditions.height === 0) {
     return "flat";
   }
 
-  const matchingRule = RATING_RULES.find(
-    (rule) => height >= rule.minHeight && period >= rule.minPeriod && windSpeed < rule.maxWind
-  );
+  const matchingRule = RATING_RULES.find((rule) => isMatchingRule(rule, conditions));
 
   return matchingRule ? matchingRule.rating : "poor";
 };

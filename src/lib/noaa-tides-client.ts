@@ -32,12 +32,29 @@ async function fetchFromNoaa(url: URL) {
 function calculateEndDate(dateStr: string): string {
   const year = parseInt(dateStr.substring(0, 4));
   const month = parseInt(dateStr.substring(4, 6)) - 1;
-  const day = parseInt(dateStr.substring(6, 8)) + 2;
+  const day = parseInt(dateStr.substring(6, 8));
 
-  return new Date(year, month, day)
-    .toISOString()
-    .split("T")[0]
-    .replace(/-/g, "");
+  const date = new Date(year, month, day);
+  date.setDate(date.getDate() + 2);
+
+  return date.toISOString().split("T")[0].replace(/-/g, "");
+}
+
+function mapTidePredictions(predictions: any[]): TidePrediction[] {
+  return predictions.map((prediction: any) => ({
+    time: prediction.t,
+    height: parseFloat(prediction.v),
+    type: prediction.type === "H" ? "high" : "low",
+  }));
+}
+
+function extractLatestWaterTemp(data: any): number {
+  if (!data.data || data.data.length === 0) {
+    throw new Error("No water temperature data found");
+  }
+
+  const latestObservation = data.data[data.data.length - 1];
+  return parseFloat(latestObservation.v);
 }
 
 export const fetchTides = async (stationId: string, date: string): Promise<TidePrediction[]> => {
@@ -59,11 +76,7 @@ export const fetchTides = async (stationId: string, date: string): Promise<TideP
     throw new Error(`No tide predictions found for station ${stationId}`);
   }
 
-  return data.predictions.map((prediction: any) => ({
-    time: prediction.t,
-    height: parseFloat(prediction.v),
-    type: prediction.type === "H" ? "high" : "low",
-  }));
+  return mapTidePredictions(data.predictions);
 };
 
 export const fetchWaterTemp = async (stationId: string): Promise<number> => {
@@ -78,10 +91,9 @@ export const fetchWaterTemp = async (stationId: string): Promise<number> => {
 
   const data = await fetchFromNoaa(url);
 
-  if (!data.data || data.data.length === 0) {
-    throw new Error(`No water temperature data found for station ${stationId}`);
+  try {
+    return extractLatestWaterTemp(data);
+  } catch (error: any) {
+    throw new Error(`${error.message} for station ${stationId}`);
   }
-
-  const latestObservation = data.data[data.data.length - 1];
-  return parseFloat(latestObservation.v);
 };
