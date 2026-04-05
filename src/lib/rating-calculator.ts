@@ -3,31 +3,40 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type Rating = "flat" | "poor" | "poor-fair" | "fair" | "fair-good" | "good" | "epic";
+export type SurfRating = "flat" | "poor" | "poor-fair" | "fair" | "fair-good" | "good" | "epic";
 
-interface RatingRule {
-  minHeight: number;
-  minPeriod: number;
-  maxWind: number;
-  rating: Rating;
+export interface WaveConditions {
+  heightInMeters: number;
+  periodInSeconds: number;
+  windSpeedInMph: number;
 }
 
-const RATING_RULES: RatingRule[] = [
-  { minHeight: 1.8, minPeriod: 14, maxWind: 10, rating: "epic" },
-  { minHeight: 1.2, minPeriod: 12, maxWind: 15, rating: "good" },
-  { minHeight: 0.9, minPeriod: 10, maxWind: Infinity, rating: "fair-good" },
-  { minHeight: 0.6, minPeriod: 8, maxWind: Infinity, rating: "fair" },
-  { minHeight: 0.3, minPeriod: 0, maxWind: Infinity, rating: "poor-fair" },
+interface RatingThreshold {
+  minHeightInMeters: number;
+  minPeriodInSeconds: number;
+  maxWindSpeedInMph: number;
+  rating: SurfRating;
+}
+
+const RATING_THRESHOLDS: RatingThreshold[] = [
+  { minHeightInMeters: 1.8, minPeriodInSeconds: 14, maxWindSpeedInMph: 10, rating: "epic" },
+  { minHeightInMeters: 1.2, minPeriodInSeconds: 12, maxWindSpeedInMph: 15, rating: "good" },
+  { minHeightInMeters: 0.9, minPeriodInSeconds: 10, maxWindSpeedInMph: Infinity, rating: "fair-good" },
+  { minHeightInMeters: 0.6, minPeriodInSeconds: 8, maxWindSpeedInMph: Infinity, rating: "fair" },
+  { minHeightInMeters: 0.3, minPeriodInSeconds: 0, maxWindSpeedInMph: Infinity, rating: "poor-fair" },
 ];
 
-export const ratingFromWaveData = (height: number, period: number, windSpeed: number): Rating => {
-  if (height === 0) {
+export const calculateSurfRating = (conditions: WaveConditions): SurfRating => {
+  if (conditions.heightInMeters === 0) {
     return "flat";
   }
 
-  const matchingRule = RATING_RULES.find(
-    (rule) => height >= rule.minHeight && period >= rule.minPeriod && windSpeed < rule.maxWind
+  const matchingThreshold = RATING_THRESHOLDS.find(
+    (threshold) =>
+      conditions.heightInMeters >= threshold.minHeightInMeters &&
+      conditions.periodInSeconds >= threshold.minPeriodInSeconds &&
+      conditions.windSpeedInMph < threshold.maxWindSpeedInMph
   );
 
-  return matchingRule ? matchingRule.rating : "poor";
+  return matchingThreshold?.rating ?? "poor";
 };

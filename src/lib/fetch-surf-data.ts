@@ -5,7 +5,7 @@
 
 import { fetchMarineData, fetchWindData } from "./open-meteo-client";
 import { fetchTides, fetchWaterTemp } from "./noaa-tides-client";
-import { transformToSurfProps, SpotMeta } from "./transform-to-schema";
+import { transformToSurfProps, SpotMetadata } from "./transform-to-schema";
 import { SurfForecastProps, surfForecastSchema } from "../schemas/surf-forecast";
 
 async function fetchNoaaData(noaaStationId: string, dateStr: string) {
@@ -15,30 +15,30 @@ async function fetchNoaaData(noaaStationId: string, dateStr: string) {
   ]);
 }
 
-export const fetchSurfData = async (lat: number, lon: number, spotMeta: SpotMeta): Promise<SurfForecastProps> => {
+export const fetchSurfData = async (lat: number, lon: number, spotMetadata: SpotMetadata): Promise<SurfForecastProps> => {
   const now = new Date();
   const dateStr = now.toISOString().split("T")[0].replace(/-/g, "");
 
-  console.log(`Fetching data for ${spotMeta.spotName} (${lat}, ${lon})...`);
+  console.log(`Fetching data for ${spotMetadata.spotName} (${lat}, ${lon})...`);
 
-  const [marineData, windData] = await Promise.all([
+  const [marineConditions, windConditions] = await Promise.all([
     fetchMarineData(lat, lon),
     fetchWindData(lat, lon),
   ]);
 
-  let tidesData: any[] = [];
-  let waterTemp: number | null = null;
+  let tidePredictions: any[] = [];
+  let waterTemperature: number | null = null;
 
-  if (spotMeta.noaaStationId) {
-    [tidesData, waterTemp] = await fetchNoaaData(spotMeta.noaaStationId, dateStr);
+  if (spotMetadata.noaaStationId) {
+    [tidePredictions, waterTemperature] = await fetchNoaaData(spotMetadata.noaaStationId, dateStr);
   }
 
   const props = transformToSurfProps({
-    marineData,
-    windData,
-    tidesData,
-    waterTemp,
-    spotMeta,
+    marineConditions,
+    windConditions,
+    tidePredictions,
+    waterTemperature,
+    spotMetadata,
     targetDate: now.toISOString(),
   });
 
