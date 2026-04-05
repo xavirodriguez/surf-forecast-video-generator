@@ -1,6 +1,6 @@
-import { SpotMeta } from "./transform-to-schema";
+import { SpotMetadata } from "./transform-to-schema";
 
-export type SpotExample = SpotMeta & { lat: number; lon: number };
+export type SpotExample = SpotMetadata & { lat: number; lon: number };
 
 export const spotExamples: SpotExample[] = [
   {
