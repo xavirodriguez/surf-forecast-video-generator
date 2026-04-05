@@ -3,73 +3,74 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ratingFromWaveData } from "./rating-calculator";
+import { calculateSurfRating, WaveConditions } from "./rating-calculator";
 
-const assertEqual = (actual: any, expected: any, message: string) => {
+const assertEqual = (actual: any, expected: any, description: string) => {
   if (actual !== expected) {
     throw new Error(
-      `FAIL: ${message}\n` +
+      `FAIL: ${description}\n` +
       `  Expected: "${expected}"\n` +
       `  Actual:   "${actual}"`
     );
   }
-  console.log(`PASS: ${message}`);
+  console.log(`PASS: ${description}`);
 };
 
-const runTests = () => {
+const runRatingTests = () => {
   console.log("Running rating-calculator tests...");
 
-  // Flat condition
-  // Given: No wave height
-  // When: ratingFromWaveData is called
-  // Then: Returns "flat"
-  assertEqual(
-    ratingFromWaveData({ height: 0, period: 10, windSpeed: 5 }),
-    "flat",
-    "Should return flat for zero wave height"
-  );
-
-  // Epic condition
-  // Given: High waves, long period, low wind
-  // When: ratingFromWaveData is called
-  // Then: Returns "epic"
-  assertEqual(
-    ratingFromWaveData({ height: 1.9, period: 15, windSpeed: 8 }),
-    "epic",
-    "Should return epic for 1.9m height, 15s period, and low wind"
-  );
-
-  // Good condition
-  // Given: Moderate waves and long period
-  // When: ratingFromWaveData is called
-  // Then: Returns "good"
-  assertEqual(
-    ratingFromWaveData({ height: 1.3, period: 13, windSpeed: 10 }),
-    "good",
-    "Should return good for 1.3m height and 13s period"
-  );
-
-  // Poor-Fair condition
-  // Given: Small waves with short period
-  // When: ratingFromWaveData is called
-  // Then: Returns "poor-fair"
-  assertEqual(
-    ratingFromWaveData({ height: 0.5, period: 4, windSpeed: 10 }),
-    "poor-fair",
-    "Should return poor-fair for small wave with any period"
-  );
-
-  // Poor condition
-  // Given: Very small waves not matching any rule
-  // When: ratingFromWaveData is called
-  // Then: Returns "poor"
-  assertEqual(
-    ratingFromWaveData({ height: 0.2, period: 10, windSpeed: 5 }),
-    "poor",
-    "Should return poor for very small waves that don't match any rule"
-  );
+  testFlatConditions();
+  testEpicConditions();
+  testGoodConditions();
+  testPoorFairConditions();
+  testPoorConditions();
 
   console.log("All rating-calculator tests passed!");
 };
 
-runTests();
+const testFlatConditions = () => {
+  // Given: No wave height
+  const conditions: WaveConditions = { heightInMeters: 0, periodInSeconds: 10, windSpeedInMph: 5 };
+  // When: calculateSurfRating is called
+  const rating = calculateSurfRating(conditions);
+  // Then: Returns "flat"
+  assertEqual(rating, "flat", "Should return flat for zero wave height");
+};
+
+const testEpicConditions = () => {
+  // Given: High waves, long period, low wind
+  const conditions: WaveConditions = { heightInMeters: 1.9, periodInSeconds: 15, windSpeedInMph: 8 };
+  // When: calculateSurfRating is called
+  const rating = calculateSurfRating(conditions);
+  // Then: Returns "epic"
+  assertEqual(rating, "epic", "Should return epic for large height, long period, and low wind");
+};
+
+const testGoodConditions = () => {
+  // Given: Moderate waves and long period
+  const conditions: WaveConditions = { heightInMeters: 1.3, periodInSeconds: 13, windSpeedInMph: 10 };
+  // When: calculateSurfRating is called
+  const rating = calculateSurfRating(conditions);
+  // Then: Returns "good"
+  assertEqual(rating, "good", "Should return good for moderate height and period");
+};
+
+const testPoorFairConditions = () => {
+  // Given: Small waves with short period
+  const conditions: WaveConditions = { heightInMeters: 0.5, periodInSeconds: 4, windSpeedInMph: 10 };
+  // When: calculateSurfRating is called
+  const rating = calculateSurfRating(conditions);
+  // Then: Returns "poor-fair"
+  assertEqual(rating, "poor-fair", "Should return poor-fair for small wave with short period");
+};
+
+const testPoorConditions = () => {
+  // Given: Very small waves not matching any rule
+  const conditions: WaveConditions = { heightInMeters: 0.2, periodInSeconds: 10, windSpeedInMph: 5 };
+  // When: calculateSurfRating is called
+  const rating = calculateSurfRating(conditions);
+  // Then: Returns "poor"
+  assertEqual(rating, "poor", "Should return poor for very small waves that don't match thresholds");
+};
+
+runRatingTests();
