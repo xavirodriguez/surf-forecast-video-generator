@@ -32,12 +32,12 @@ async function fetchFromNoaa(url: URL) {
 function calculateEndDate(dateStr: string): string {
   const year = parseInt(dateStr.substring(0, 4));
   const month = parseInt(dateStr.substring(4, 6)) - 1;
-  const day = parseInt(dateStr.substring(6, 8)) + 2;
+  const day = parseInt(dateStr.substring(6, 8));
 
-  return new Date(year, month, day)
-    .toISOString()
-    .split("T")[0]
-    .replace(/-/g, "");
+  const date = new Date(year, month, day);
+  date.setDate(date.getDate() + 2);
+
+  return date.toISOString().split("T")[0].replace(/-/g, "");
 }
 
 export const fetchTides = async (stationId: string, date: string): Promise<TidePrediction[]> => {
