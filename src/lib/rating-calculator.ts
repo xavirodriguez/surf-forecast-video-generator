@@ -11,14 +11,14 @@ export interface WaveConditions {
   windSpeedInMph: number;
 }
 
-interface RatingThreshold {
+interface SurfRatingThreshold {
   minHeightInMeters: number;
   minPeriodInSeconds: number;
   maxWindSpeedInMph: number;
   rating: SurfRating;
 }
 
-const RATING_THRESHOLDS: RatingThreshold[] = [
+const SURF_RATING_THRESHOLDS: SurfRatingThreshold[] = [
   { minHeightInMeters: 1.8, minPeriodInSeconds: 14, maxWindSpeedInMph: 10, rating: "epic" },
   { minHeightInMeters: 1.2, minPeriodInSeconds: 12, maxWindSpeedInMph: 15, rating: "good" },
   { minHeightInMeters: 0.9, minPeriodInSeconds: 10, maxWindSpeedInMph: Infinity, rating: "fair-good" },
@@ -31,12 +31,20 @@ export const calculateSurfRating = (conditions: WaveConditions): SurfRating => {
     return "flat";
   }
 
-  const matchingThreshold = RATING_THRESHOLDS.find(
-    (threshold) =>
-      conditions.heightInMeters >= threshold.minHeightInMeters &&
-      conditions.periodInSeconds >= threshold.minPeriodInSeconds &&
-      conditions.windSpeedInMph < threshold.maxWindSpeedInMph
+  const matchingThreshold = SURF_RATING_THRESHOLDS.find((threshold) =>
+    isConditionMatchingThreshold(conditions, threshold)
   );
 
   return matchingThreshold?.rating ?? "poor";
+};
+
+const isConditionMatchingThreshold = (
+  conditions: WaveConditions,
+  threshold: SurfRatingThreshold
+): boolean => {
+  return (
+    conditions.heightInMeters >= threshold.minHeightInMeters &&
+    conditions.periodInSeconds >= threshold.minPeriodInSeconds &&
+    conditions.windSpeedInMph < threshold.maxWindSpeedInMph
+  );
 };
