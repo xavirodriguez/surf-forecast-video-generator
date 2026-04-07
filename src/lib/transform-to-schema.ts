@@ -75,40 +75,55 @@ const mapCurrentConditionsToProps = (mappingContext: {
 }) => {
   const { forecastSource, averages, targetTimeIndex } = mappingContext;
   const { marineConditions, windConditions, spotMetadata } = forecastSource;
+  const { currentWaveHeightUnit, waterTempUnit } = spotMetadata;
 
   return {
-    ...mapWaveConditions(averages, spotMetadata.currentWaveHeightUnit, targetTimeIndex, marineConditions),
-    ...mapWaterConditions(forecastSource, targetTimeIndex),
-    ...mapWindConditions(averages, targetTimeIndex, windConditions),
+    ...mapWaveConditions({ averages, unit: currentWaveHeightUnit, targetTimeIndex, marineConditions }),
+    ...mapWaterConditions(forecastSource.waterTemperature, waterTempUnit),
+    ...mapWindConditions({ averages, targetTimeIndex, windConditions }),
   };
 };
 
-const mapWaveConditions = (
-  averages: WaveConditions,
-  unit: "ft" | "m",
-  targetTimeIndex: number,
-  marineConditions: MarineData
-) => ({
-  currentWaveHeight: parseFloat(convertMetersToUserUnit(averages.heightInMeters, unit).toFixed(1)),
-  currentWaveHeightUnit: unit,
-  currentPeriod: Math.round(averages.periodInSeconds),
-  currentDirection: degreesToCardinal(marineConditions.hourly.wave_direction[targetTimeIndex]),
-  currentDirectionDegrees: marineConditions.hourly.wave_direction[targetTimeIndex],
-});
+const mapWaveConditions = (context: {
+  averages: WaveConditions;
+  unit: "ft" | "m";
+  targetTimeIndex: number;
+  marineConditions: MarineData;
+}) => {
+  const { averages, unit, targetTimeIndex, marineConditions } = context;
+  const waveDirection = marineConditions.hourly.wave_direction[targetTimeIndex];
+  const convertedHeight = convertMetersToUserUnit(averages.heightInMeters, unit);
 
-const mapWaterConditions = (forecastSource: ForecastSource, targetTimeIndex: number) => {
-  const { waterTemperature, spotMetadata } = forecastSource;
   return {
-    waterTemp: Math.round(convertCelsiusToUserUnit(waterTemperature, spotMetadata.waterTempUnit)),
-    waterTempUnit: spotMetadata.waterTempUnit,
+    currentWaveHeight: parseFloat(convertedHeight.toFixed(1)),
+    currentWaveHeightUnit: unit,
+    currentPeriod: Math.round(averages.periodInSeconds),
+    currentDirection: degreesToCardinal(waveDirection),
+    currentDirectionDegrees: waveDirection,
   };
 };
 
-const mapWindConditions = (averages: WaveConditions, targetTimeIndex: number, windConditions: WindData) => ({
-  windSpeed: Math.round(averages.windSpeedInMph),
-  windDirection: degreesToCardinal(windConditions.hourly.winddirection_10m[targetTimeIndex]),
-  windDirectionDegrees: windConditions.hourly.winddirection_10m[targetTimeIndex],
-});
+const mapWaterConditions = (waterTemperature: number, unit: "C" | "F") => {
+  return {
+    waterTemp: Math.round(convertCelsiusToUserUnit(waterTemperature, unit)),
+    waterTempUnit: unit,
+  };
+};
+
+const mapWindConditions = (context: {
+  averages: WaveConditions;
+  targetTimeIndex: number;
+  windConditions: WindData;
+}) => {
+  const { averages, targetTimeIndex, windConditions } = context;
+  const windDirection = windConditions.hourly.winddirection_10m[targetTimeIndex];
+
+  return {
+    windSpeed: Math.round(averages.windSpeedInMph),
+    windDirection: degreesToCardinal(windDirection),
+    windDirectionDegrees: windDirection,
+  };
+};
 
 const mapStyleToProps = (metadata: SpotMetadata) => ({
   primaryColor: metadata.primaryColor,
@@ -118,10 +133,14 @@ const mapStyleToProps = (metadata: SpotMetadata) => ({
   logoUrl: metadata.logoUrl,
 });
 
+const CARDINAL_POINTS = [
+  "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+  "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+];
+
 export const degreesToCardinal = (degrees: number): string => {
-  const cardinals = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
   const index = Math.round(degrees / 22.5) % 16;
-  return cardinals[index];
+  return CARDINAL_POINTS[index];
 };
 
 function calculateAverageConditions(mappingContext: {
@@ -130,12 +149,19 @@ function calculateAverageConditions(mappingContext: {
   targetTimeIndex: number;
 }): WaveConditions {
   const { marineConditions, windConditions, targetTimeIndex } = mappingContext;
-  const nextIndices = [targetTimeIndex, targetTimeIndex + 1].filter((i) => i < marineConditions.hourly.time.length);
+  const indices = [targetTimeIndex, targetTimeIndex + 1].filter((i) => i < marineConditions.hourly.time.length);
+
   return {
-    heightInMeters: nextIndices.reduce((acc, i) => acc + marineConditions.hourly.wave_height[i], 0) / nextIndices.length,
-    periodInSeconds: nextIndices.reduce((acc, i) => acc + marineConditions.hourly.wave_period[i], 0) / nextIndices.length,
-    windSpeedInMph: nextIndices.reduce((acc, i) => acc + windConditions.hourly.windspeed_10m[i], 0) / nextIndices.length,
+    heightInMeters: averageArray(indices.map((i) => marineConditions.hourly.wave_height[i])),
+    periodInSeconds: averageArray(indices.map((i) => marineConditions.hourly.wave_period[i])),
+    windSpeedInMph: averageArray(indices.map((i) => windConditions.hourly.windspeed_10m[i])),
   };
+}
+
+function averageArray(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sum = values.reduce((acc, val) => acc + val, 0);
+  return sum / values.length;
 }
 
 function mapToHourlyForecast(forecastSource: ForecastSource, date: Date): SurfForecastProps["hourlyForecast"] {

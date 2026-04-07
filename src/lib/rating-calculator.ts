@@ -42,9 +42,9 @@ const isConditionMatchingThreshold = (
   conditions: WaveConditions,
   threshold: SurfRatingThreshold
 ): boolean => {
-  return (
-    conditions.heightInMeters >= threshold.minHeightInMeters &&
-    conditions.periodInSeconds >= threshold.minPeriodInSeconds &&
-    conditions.windSpeedInMph < threshold.maxWindSpeedInMph
-  );
+  const hasMinHeight = conditions.heightInMeters >= threshold.minHeightInMeters;
+  const hasMinPeriod = conditions.periodInSeconds >= threshold.minPeriodInSeconds;
+  const hasMaxWind = conditions.windSpeedInMph < threshold.maxWindSpeedInMph;
+
+  return hasMinHeight && hasMinPeriod && hasMaxWind;
 };
