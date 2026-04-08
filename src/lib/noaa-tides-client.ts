@@ -61,8 +61,8 @@ export const fetchTides = async (stationId: string, date: string): Promise<TideP
     units: "metric",
   });
 
-  const data = await fetchFromNoaa(url);
-  return mapTidePredictions(data.predictions, stationId);
+  const noaaResponse = await fetchFromNoaa(url);
+  return mapTidePredictions(noaaResponse.predictions, stationId);
 };
 
 export const fetchWaterTemp = async (stationId: string): Promise<number> => {
@@ -75,8 +75,8 @@ export const fetchWaterTemp = async (stationId: string): Promise<number> => {
     units: "metric",
   });
 
-  const data = await fetchFromNoaa(url);
-  return mapWaterTemperature(data.data, stationId);
+  const noaaResponse = await fetchFromNoaa(url);
+  return mapWaterTemperature(noaaResponse.data, stationId);
 };
 
 interface NoaaTidePrediction {
