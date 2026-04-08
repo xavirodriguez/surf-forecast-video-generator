@@ -1,4 +1,4 @@
-export type MarineData = {
+export type MarineForecastResponse = {
   hourly: {
     time: string[];
     wave_height: number[];
@@ -11,7 +11,7 @@ export type MarineData = {
   };
 };
 
-export const fetchMarineData = async (lat: number, lon: number): Promise<MarineData> => {
+export const fetchMarineData = async (lat: number, lon: number): Promise<MarineForecastResponse> => {
   const url = new URL("https://marine-api.open-meteo.com/v1/marine");
   url.searchParams.set("latitude", lat.toString());
   url.searchParams.set("longitude", lon.toString());
@@ -29,7 +29,7 @@ export const fetchMarineData = async (lat: number, lon: number): Promise<MarineD
   return response.json();
 };
 
-export type WindData = {
+export type WindForecastResponse = {
   hourly: {
     time: string[];
     windspeed_10m: number[];
@@ -38,7 +38,7 @@ export type WindData = {
   };
 };
 
-export const fetchWindData = async (lat: number, lon: number): Promise<WindData> => {
+export const fetchWindData = async (lat: number, lon: number): Promise<WindForecastResponse> => {
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", lat.toString());
   url.searchParams.set("longitude", lon.toString());

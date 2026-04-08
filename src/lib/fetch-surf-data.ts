@@ -5,7 +5,7 @@
 
 import { fetchMarineData, fetchWindData } from "./open-meteo-client";
 import { fetchTides, fetchWaterTemp, formatDateToNoaaString } from "./noaa-tides-client";
-import { transformToSurfProps, SpotMetadata, ForecastSource } from "./transform-to-schema";
+import { transformToSurfProps, SpotMetadata, RawForecastData } from "./transform-to-schema";
 import { SurfForecastProps, surfForecastSchema } from "../schemas/surf-forecast";
 
 export const fetchSurfData = async (
@@ -32,8 +32,8 @@ export const fetchSurfData = async (
   });
 };
 
-function composeAndValidateProps(forecastSource: ForecastSource): SurfForecastProps {
-  const props = transformToSurfProps(forecastSource);
+function composeAndValidateProps(rawForecastData: RawForecastData): SurfForecastProps {
+  const props = transformToSurfProps(rawForecastData);
   return surfForecastSchema.parse(props);
 }
 

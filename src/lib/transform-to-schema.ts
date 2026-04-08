@@ -3,11 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MarineData, WindData } from "./open-meteo-client";
+import { MarineForecastResponse, WindForecastResponse } from "./open-meteo-client";
 import { TidePrediction } from "./noaa-tides-client";
 import { SurfForecastProps } from "../schemas/surf-forecast";
 import { calculateSurfRating, WaveConditions } from "./rating-calculator";
 import { convertCelsiusToUserUnit, convertMetersToUserUnit } from "./conversions";
+import { averageArray } from "./math-utils";
+import { degreesToCardinal } from "./geo-utils";
 
 export type SpotMetadata = {
   spotName: string;
@@ -22,9 +24,9 @@ export type SpotMetadata = {
   waterTempUnit: "C" | "F";
 };
 
-export interface ForecastSource {
-  marineConditions: MarineData;
-  windConditions: WindData;
+export interface RawForecastData {
+  marineConditions: MarineForecastResponse;
+  windConditions: WindForecastResponse;
   tidePredictions: TidePrediction[];
   waterTemperature: number;
   spotMetadata: SpotMetadata;
@@ -38,8 +40,8 @@ const FALLBACK_TIDE_PREDICTIONS: SurfForecastProps["tides"] = [
   { time: "23:30", height: 0.5, type: "low" },
 ];
 
-export const transformToSurfProps = (forecastSource: ForecastSource): SurfForecastProps => {
-  const { marineConditions, windConditions, spotMetadata, targetDate } = forecastSource;
+export const transformToSurfProps = (rawForecastData: RawForecastData): SurfForecastProps => {
+  const { marineConditions, windConditions, spotMetadata, targetDate } = rawForecastData;
   const targetMoment = new Date(targetDate);
   const targetTimeIndex = resolveTargetTimeIndex(marineConditions, targetMoment);
 
@@ -47,16 +49,16 @@ export const transformToSurfProps = (forecastSource: ForecastSource): SurfForeca
 
   return {
     ...mapMetadataToProps(spotMetadata, targetMoment),
-    ...mapCurrentConditionsToProps({ forecastSource, averages: averageConditions, targetTimeIndex }),
+    ...mapCurrentConditionsToProps({ rawForecastData, averages: averageConditions, targetTimeIndex }),
     overallRating: calculateSurfRating(averageConditions),
-    hourlyForecast: mapToHourlyForecast(forecastSource, targetMoment),
+    hourlyForecast: mapHourlyForecast(rawForecastData, targetMoment),
     swellData: identifySwellComponents(marineConditions, spotMetadata.currentWaveHeightUnit, targetTimeIndex),
-    tides: resolveTidePredictions(forecastSource.tidePredictions),
+    tides: resolveTidePredictions(rawForecastData.tidePredictions),
     ...mapStyleToProps(spotMetadata),
   };
 };
 
-const resolveTargetTimeIndex = (marine: MarineData, date: Date): number => {
+const resolveTargetTimeIndex = (marine: MarineForecastResponse, date: Date): number => {
   const timeString = date.toISOString().substring(0, 13);
   const index = marine.hourly.time.findIndex((t) => t.startsWith(timeString));
   return index === -1 ? 0 : index;
@@ -69,17 +71,17 @@ const mapMetadataToProps = (metadata: SpotMetadata, date: Date) => ({
 });
 
 const mapCurrentConditionsToProps = (mappingContext: {
-  forecastSource: ForecastSource;
+  rawForecastData: RawForecastData;
   averages: WaveConditions;
   targetTimeIndex: number;
 }) => {
-  const { forecastSource, averages, targetTimeIndex } = mappingContext;
-  const { marineConditions, windConditions, spotMetadata } = forecastSource;
+  const { rawForecastData, averages, targetTimeIndex } = mappingContext;
+  const { marineConditions, windConditions, spotMetadata } = rawForecastData;
   const { currentWaveHeightUnit, waterTempUnit } = spotMetadata;
 
   return {
     ...mapWaveConditions({ averages, unit: currentWaveHeightUnit, targetTimeIndex, marineConditions }),
-    ...mapWaterConditions(forecastSource.waterTemperature, waterTempUnit),
+    ...mapWaterConditions(rawForecastData.waterTemperature, waterTempUnit),
     ...mapWindConditions({ averages, targetTimeIndex, windConditions }),
   };
 };
@@ -88,7 +90,7 @@ const mapWaveConditions = (context: {
   averages: WaveConditions;
   unit: "ft" | "m";
   targetTimeIndex: number;
-  marineConditions: MarineData;
+  marineConditions: MarineForecastResponse;
 }) => {
   const { averages, unit, targetTimeIndex, marineConditions } = context;
   const waveDirection = marineConditions.hourly.wave_direction[targetTimeIndex];
@@ -113,7 +115,7 @@ const mapWaterConditions = (waterTemperature: number, unit: "C" | "F") => {
 const mapWindConditions = (context: {
   averages: WaveConditions;
   targetTimeIndex: number;
-  windConditions: WindData;
+  windConditions: WindForecastResponse;
 }) => {
   const { averages, targetTimeIndex, windConditions } = context;
   const windDirection = windConditions.hourly.winddirection_10m[targetTimeIndex];
@@ -133,19 +135,9 @@ const mapStyleToProps = (metadata: SpotMetadata) => ({
   logoUrl: metadata.logoUrl,
 });
 
-const CARDINAL_POINTS = [
-  "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
-  "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
-];
-
-export const degreesToCardinal = (degrees: number): string => {
-  const index = Math.round(degrees / 22.5) % 16;
-  return CARDINAL_POINTS[index];
-};
-
 function calculateAverageConditions(mappingContext: {
-  marineConditions: MarineData;
-  windConditions: WindData;
+  marineConditions: MarineForecastResponse;
+  windConditions: WindForecastResponse;
   targetTimeIndex: number;
 }): WaveConditions {
   const { marineConditions, windConditions, targetTimeIndex } = mappingContext;
@@ -158,22 +150,16 @@ function calculateAverageConditions(mappingContext: {
   };
 }
 
-function averageArray(values: number[]): number {
-  if (values.length === 0) return 0;
-  const sum = values.reduce((acc, val) => acc + val, 0);
-  return sum / values.length;
-}
-
-function mapToHourlyForecast(forecastSource: ForecastSource, date: Date): SurfForecastProps["hourlyForecast"] {
+function mapHourlyForecast(rawForecastData: RawForecastData, date: Date): SurfForecastProps["hourlyForecast"] {
   const targetDayStr = date.toISOString().split("T")[0];
   const startHour = Math.max(date.getHours(), 6);
-  const hourlyIndices = findHourlyIndices(forecastSource.marineConditions, targetDayStr, startHour);
+  const hourlyIndices = findHourlyIndices(rawForecastData.marineConditions, targetDayStr, startHour);
 
-  return hourlyIndices.map((index) => mapSingleHour(forecastSource, index));
+  return hourlyIndices.map((index) => mapSingleHour(rawForecastData, index));
 }
 
-function mapSingleHour(forecastSource: ForecastSource, index: number) {
-  const { marineConditions, windConditions, spotMetadata } = forecastSource;
+function mapSingleHour(rawForecastData: RawForecastData, index: number) {
+  const { marineConditions, windConditions, spotMetadata } = rawForecastData;
   const height = marineConditions.hourly.wave_height[index];
   const period = marineConditions.hourly.wave_period[index];
   const windSpeed = windConditions.hourly.windspeed_10m[index];
@@ -187,7 +173,7 @@ function mapSingleHour(forecastSource: ForecastSource, index: number) {
   };
 }
 
-function findHourlyIndices(marine: MarineData, dayStr: string, startHour: number): number[] {
+function findHourlyIndices(marine: MarineForecastResponse, dayStr: string, startHour: number): number[] {
   const indices: number[] = [];
   for (let i = 0; i < 8; i++) {
     const targetHour = startHour + i;
@@ -198,14 +184,19 @@ function findHourlyIndices(marine: MarineData, dayStr: string, startHour: number
   return indices;
 }
 
-function identifySwellComponents(marine: MarineData, unit: "ft" | "m", index: number): SurfForecastProps["swellData"] {
-  return [
+function identifySwellComponents(
+  marine: MarineForecastResponse,
+  unit: "ft" | "m",
+  index: number
+): SurfForecastProps["swellData"] {
+  const swellComponents = [
     mapPrimarySwell(marine, unit, index),
     mapWindWave(marine, unit, index)
-  ].filter((swell) => swell.height > 0);
+  ];
+  return swellComponents.filter((swell) => swell.height > 0);
 }
 
-function mapPrimarySwell(marine: MarineData, unit: "ft" | "m", index: number) {
+function mapPrimarySwell(marine: MarineForecastResponse, unit: "ft" | "m", index: number) {
   return {
     height: parseFloat(convertMetersToUserUnit(marine.hourly.swell_wave_height[index], unit).toFixed(1)),
     period: Math.round(marine.hourly.swell_wave_period[index]),
@@ -214,7 +205,7 @@ function mapPrimarySwell(marine: MarineData, unit: "ft" | "m", index: number) {
   };
 }
 
-function mapWindWave(marine: MarineData, unit: "ft" | "m", index: number) {
+function mapWindWave(marine: MarineForecastResponse, unit: "ft" | "m", index: number) {
   return {
     height: parseFloat(convertMetersToUserUnit(marine.hourly.wind_wave_height[index], unit).toFixed(1)),
     period: Math.round(marine.hourly.wave_period[index] * 0.8),
