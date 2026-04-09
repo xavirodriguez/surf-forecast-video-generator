@@ -42,9 +42,12 @@ const isCriteriaMatch = (
   conditions: WaveConditions,
   criteria: RatingCriteria
 ): boolean => {
-  const hasMinHeight = conditions.heightInMeters >= criteria.minHeightInMeters;
-  const hasMinPeriod = conditions.periodInSeconds >= criteria.minPeriodInSeconds;
-  const hasMaxWind = conditions.windSpeedInMph < criteria.maxWindSpeedInMph;
+  const { heightInMeters, periodInSeconds, windSpeedInMph } = conditions;
+  const { minHeightInMeters, minPeriodInSeconds, maxWindSpeedInMph } = criteria;
+
+  const hasMinHeight = heightInMeters >= minHeightInMeters;
+  const hasMinPeriod = periodInSeconds >= minPeriodInSeconds;
+  const hasMaxWind = windSpeedInMph < maxWindSpeedInMph;
 
   return hasMinHeight && hasMinPeriod && hasMaxWind;
 };

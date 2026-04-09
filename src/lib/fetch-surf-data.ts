@@ -8,34 +8,35 @@ import { fetchTides, fetchWaterTemp, formatDateToNoaaString } from "./noaa-tides
 import { transformToSurfProps, SpotMetadata, RawForecastData } from "./transform-to-schema";
 import { SurfForecastProps, surfForecastSchema } from "../schemas/surf-forecast";
 
-export const fetchSurfData = async (
-  lat: number,
-  lon: number,
-  spotMetadata: SpotMetadata
-): Promise<SurfForecastProps> => {
+export const fetchSurfData = async (request: {
+  lat: number;
+  lon: number;
+  spotMetadata: SpotMetadata;
+}): Promise<SurfForecastProps> => {
+  const { lat, lon, spotMetadata } = request;
   const now = new Date();
 
-  console.log(`Fetching data for ${spotMetadata.spotName} (${lat}, ${lon})...`);
-
   const environmentalData = await fetchEnvironmentalData(lat, lon);
-  const tideAndTempData = await fetchTideAndTempData(
-    spotMetadata.noaaStationId,
-    formatDateToNoaaString(now),
-    environmentalData.windConditions.hourly.temperature_2m[0] ?? 18
-  );
+  const tideAndTempData = await fetchTideAndTempData({
+    noaaStationId: spotMetadata.noaaStationId,
+    dateStr: formatDateToNoaaString(now),
+    fallbackWaterTemp: environmentalData.windConditions.hourly.temperature_2m[0] ?? 18
+  });
 
-  return composeAndValidateProps({
+  const rawForecastData: RawForecastData = {
     ...environmentalData,
     ...tideAndTempData,
     spotMetadata,
     targetDate: now.toISOString(),
-  });
+  };
+
+  return composeAndValidateProps(rawForecastData);
 };
 
-function composeAndValidateProps(rawForecastData: RawForecastData): SurfForecastProps {
+const composeAndValidateProps = (rawForecastData: RawForecastData): SurfForecastProps => {
   const props = transformToSurfProps(rawForecastData);
   return surfForecastSchema.parse(props);
-}
+};
 
 const fetchEnvironmentalData = async (lat: number, lon: number) => {
   const [marineConditions, windConditions] = await Promise.all([
@@ -45,11 +46,12 @@ const fetchEnvironmentalData = async (lat: number, lon: number) => {
   return { marineConditions, windConditions };
 };
 
-const fetchTideAndTempData = async (
-  noaaStationId: string | undefined,
-  dateStr: string,
-  fallbackWaterTemp: number
-) => {
+const fetchTideAndTempData = async (params: {
+  noaaStationId: string | undefined;
+  dateStr: string;
+  fallbackWaterTemp: number;
+}) => {
+  const { noaaStationId, dateStr, fallbackWaterTemp } = params;
   if (!noaaStationId) {
     return { tidePredictions: [], waterTemperature: fallbackWaterTemp };
   }
