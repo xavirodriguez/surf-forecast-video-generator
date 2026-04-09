@@ -9,50 +9,23 @@ export type TidePrediction = {
   type: "high" | "low";
 };
 
+interface NoaaTidePrediction {
+  t: string;
+  v: string;
+  type: "H" | "L";
+}
+
+interface NoaaWaterTempObservation {
+  t: string;
+  v: string;
+}
+
 const NOAA_API_URL = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter";
 
-function buildNoaaUrl(params: Record<string, string>): URL {
-  const url = new URL(NOAA_API_URL);
-  const searchParams = new URLSearchParams({
-    ...params,
-    application: "surf_forecast",
-    format: "json",
-  });
-
-  url.search = searchParams.toString();
-  return url;
-}
-
-async function fetchFromNoaa(url: URL) {
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error(`NOAA API request failed with status: ${response.status}`);
-  }
-  return response.json();
-}
-
-export function formatDateToNoaaString(date: Date): string {
-  return date.toISOString().split("T")[0].replace(/-/g, "");
-}
-
-function parseNoaaDate(dateStr: string): Date {
-  const formattedDate = dateStr.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3");
-  return new Date(formattedDate);
-}
-
-function calculateEndDate(dateStr: string): string {
-  const date = parseNoaaDate(dateStr);
-  const endDate = new Date(date);
-  endDate.setDate(date.getDate() + 2);
-
-  return formatDateToNoaaString(endDate);
-}
-
-export const fetchTides = async (stationId: string, date: string): Promise<TidePrediction[]> => {
-  const endDate = calculateEndDate(date);
+export const fetchTides = async (stationId: string, beginDate: string): Promise<TidePrediction[]> => {
   const url = buildNoaaUrl({
-    begin_date: date,
-    end_date: endDate,
+    begin_date: beginDate,
+    end_date: calculateEndDate(beginDate),
     station: stationId,
     product: "predictions",
     datum: "MLLW",
@@ -79,21 +52,47 @@ export const fetchWaterTemp = async (stationId: string): Promise<number> => {
   return mapWaterTemperature(noaaResponse.data, stationId);
 };
 
-interface NoaaTidePrediction {
-  t: string;
-  v: string;
-  type: "H" | "L";
-}
+export const formatDateToNoaaString = (date: Date): string => {
+  return date.toISOString().split("T")[0].replace(/-/g, "");
+};
 
-interface NoaaWaterTempObservation {
-  t: string;
-  v: string;
-}
+const buildNoaaUrl = (params: Record<string, string>): URL => {
+  const url = new URL(NOAA_API_URL);
+  const searchParams = new URLSearchParams({
+    ...params,
+    application: "surf_forecast",
+    format: "json",
+  });
 
-function mapTidePredictions(
+  url.search = searchParams.toString();
+  return url;
+};
+
+const fetchFromNoaa = async (url: URL) => {
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error(`NOAA API request failed with status: ${response.status}`);
+  }
+  return response.json();
+};
+
+const parseNoaaDate = (dateStr: string): Date => {
+  const formattedDate = dateStr.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3");
+  return new Date(formattedDate);
+};
+
+const calculateEndDate = (dateStr: string): string => {
+  const date = parseNoaaDate(dateStr);
+  const endDate = new Date(date);
+  endDate.setDate(date.getDate() + 2);
+
+  return formatDateToNoaaString(endDate);
+};
+
+const mapTidePredictions = (
   predictions: NoaaTidePrediction[] | undefined,
   stationId: string
-): TidePrediction[] {
+): TidePrediction[] => {
   if (!predictions) {
     throw new Error(`No tide predictions found for station ${stationId}`);
   }
@@ -103,16 +102,16 @@ function mapTidePredictions(
     height: parseFloat(prediction.v),
     type: prediction.type === "H" ? "high" : "low",
   }));
-}
+};
 
-function mapWaterTemperature(
+const mapWaterTemperature = (
   observations: NoaaWaterTempObservation[] | undefined,
   stationId: string
-): number {
+): number => {
   if (!observations || observations.length === 0) {
     throw new Error(`No water temperature data found for station ${stationId}`);
   }
 
   const latestObservation = observations[observations.length - 1];
   return parseFloat(latestObservation.v);
-}
+};

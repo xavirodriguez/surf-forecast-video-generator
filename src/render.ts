@@ -42,7 +42,7 @@ const start = async () => {
       waterTempUnit: (args.temp === "F" ? "F" : "C") as "C" | "F",
     };
 
-    surfData = await fetchSurfData(lat, lon, spotMeta);
+    surfData = await fetchSurfData({ lat, lon, spotMetadata: spotMeta });
   } else {
     // Default mock data
     surfData = {
