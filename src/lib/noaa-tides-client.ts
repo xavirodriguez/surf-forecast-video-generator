@@ -22,16 +22,22 @@ interface NoaaWaterTempObservation {
 
 const NOAA_API_URL = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter";
 
+const DEFAULT_NOAA_PARAMS = {
+  datum: "MLLW",
+  time_zone: "lst_ldt",
+  units: "metric",
+  application: "surf_forecast",
+  format: "json",
+};
+
 export const fetchTides = async (stationId: string, beginDate: string): Promise<TidePrediction[]> => {
   const url = buildNoaaUrl({
     begin_date: beginDate,
     end_date: calculateEndDate(beginDate),
     station: stationId,
     product: "predictions",
-    datum: "MLLW",
-    time_zone: "lst_ldt",
     interval: "hilo",
-    units: "metric",
+    ...DEFAULT_NOAA_PARAMS,
   });
 
   const noaaResponse = await fetchFromNoaa(url);
@@ -43,9 +49,7 @@ export const fetchWaterTemp = async (stationId: string): Promise<number> => {
     range: "24",
     station: stationId,
     product: "water_temperature",
-    datum: "MLLW",
-    time_zone: "lst_ldt",
-    units: "metric",
+    ...DEFAULT_NOAA_PARAMS,
   });
 
   const noaaResponse = await fetchFromNoaa(url);
@@ -58,13 +62,7 @@ export const formatDateToNoaaString = (date: Date): string => {
 
 const buildNoaaUrl = (params: Record<string, string>): URL => {
   const url = new URL(NOAA_API_URL);
-  const searchParams = new URLSearchParams({
-    ...params,
-    application: "surf_forecast",
-    format: "json",
-  });
-
-  url.search = searchParams.toString();
+  url.search = new URLSearchParams(params).toString();
   return url;
 };
 
