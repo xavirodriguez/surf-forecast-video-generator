@@ -24,18 +24,16 @@ const RATING_CRITERIA_LIST: RatingCriteria[] = [
   { minHeightInMeters: 0.9, minPeriodInSeconds: 10, maxWindSpeedInMph: Infinity, rating: "fair-good" },
   { minHeightInMeters: 0.6, minPeriodInSeconds: 8, maxWindSpeedInMph: Infinity, rating: "fair" },
   { minHeightInMeters: 0.3, minPeriodInSeconds: 0, maxWindSpeedInMph: Infinity, rating: "poor-fair" },
+  { minHeightInMeters: 0.001, minPeriodInSeconds: 0, maxWindSpeedInMph: Infinity, rating: "poor" },
+  { minHeightInMeters: 0, minPeriodInSeconds: 0, maxWindSpeedInMph: Infinity, rating: "flat" },
 ];
 
 export const calculateSurfRating = (conditions: WaveConditions): SurfRating => {
-  if (conditions.heightInMeters === 0) {
-    return "flat";
-  }
-
   const matchedCriteria = RATING_CRITERIA_LIST.find((criteria) =>
     isCriteriaMatch(conditions, criteria)
   );
 
-  return matchedCriteria?.rating ?? "poor";
+  return matchedCriteria?.rating ?? "flat";
 };
 
 const isCriteriaMatch = (

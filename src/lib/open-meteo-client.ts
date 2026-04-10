@@ -1,3 +1,8 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 export type MarineForecastResponse = {
   hourly: {
     time: string[];
@@ -8,6 +13,15 @@ export type MarineForecastResponse = {
     swell_wave_period: number[];
     swell_wave_direction: number[];
     wind_wave_height: number[];
+  };
+};
+
+export type WindForecastResponse = {
+  hourly: {
+    time: string[];
+    windspeed_10m: number[];
+    winddirection_10m: number[];
+    temperature_2m: number[];
   };
 };
 
@@ -22,20 +36,7 @@ export const fetchMarineData = async (lat: number, lon: number): Promise<MarineF
   url.searchParams.set("forecast_days", "3");
   url.searchParams.set("timezone", "auto");
 
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error(`Failed to fetch marine data: ${response.statusText}`);
-  }
-  return response.json();
-};
-
-export type WindForecastResponse = {
-  hourly: {
-    time: string[];
-    windspeed_10m: number[];
-    winddirection_10m: number[];
-    temperature_2m: number[];
-  };
+  return fetchFromOpenMeteo<MarineForecastResponse>(url);
 };
 
 export const fetchWindData = async (lat: number, lon: number): Promise<WindForecastResponse> => {
@@ -47,9 +48,13 @@ export const fetchWindData = async (lat: number, lon: number): Promise<WindForec
   url.searchParams.set("timezone", "auto");
   url.searchParams.set("wind_speed_unit", "mph");
 
+  return fetchFromOpenMeteo<WindForecastResponse>(url);
+};
+
+async function fetchFromOpenMeteo<T>(url: URL): Promise<T> {
   const response = await fetch(url.toString());
   if (!response.ok) {
-    throw new Error(`Failed to fetch wind data: ${response.statusText}`);
+    throw new Error(`Open-Meteo API request failed: ${response.statusText}`);
   }
-  return response.json();
-};
+  return response.json() as Promise<T>;
+}
